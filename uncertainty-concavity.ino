@@ -94,80 +94,69 @@ public:
   }
 };
 
-template <size_t SIZE>
+// filters perform both smoothing and derivative calculations
+// a hann window is used as a smoothing filter (f0), and its derivatives are used to generate derivative filters (f1/f2/f3)
+// this performed better than other methods I tried with smoothing and then performing derivative calculations
+
+#define FILTER_SIZE_SMALL 11
+#define FILTER_SIZE_LARGE 50
+
 class FIRFilter {
 private:
-  double _coefficients[SIZE];
+  int _length;
+  double* _coefficients;
 
 public:
-  FIRFilter(const vector<double> coef) {
-    for (int i=0; i<SIZE; i++) {
+  FIRFilter(const int length, const vector<double> coef) {
+    _length = length;
+    _coefficients = new double[_length];
+    for (int i=0; i<length; i++) {
       _coefficients[i] = coef[i];
     }
   }
 
-  double process(const RingBuffer<SIZE>& signal) {
+  double process(const RingBuffer<FILTER_SIZE_LARGE>& signal) {
     double value = 0.0;
-    for (int i=0; i<SIZE; i++) {
-      value += _coefficients[i] * signal[SIZE - i - 1];
+    for (int i=0; i<_length; i++) {
+      value += _coefficients[i] * signal[_length - i - 1];
     }
     return value;
   } 
 };
 
-// filters perform both smoothing and derivative calculations
-// a hann window is used as a smoothing filter (f0), and its derivatives are used to generate derivative filters (f1/f2/f3)
-// this performed better than other methods I tried with smoothing and then performing derivative calculations
-
-#define FILTER_SIZE 11
-
 // length 11
-FIRFilter<FILTER_SIZE> f0({
+FIRFilter f0_small(FILTER_SIZE_SMALL, {
   0, 0.0493116, 0.17841104, 0.33798673, 0.46708618, 0.51639778, 0.46708618, 0.33798673, 0.17841104, 0.0493116, 0
 });
-FIRFilter<FILTER_SIZE> f1({
+FIRFilter f1_small(FILTER_SIZE_SMALL, {
   2.533706e-16, 0.26286556, 0.4253254, 0.4253254, 0.26286556, -0, -0.26286556, -0.4253254, -0.4253254, -0.26286556, -2.533706e-16
 });
-FIRFilter<FILTER_SIZE> f2({
+FIRFilter f2_small(FILTER_SIZE_SMALL, {
   0.40824829, 0.3302798, 0.12615566, -0.12615566, -0.3302798, -0.40824829, -0.3302798, -0.12615566, 0.12615566, 0.3302798, 0.40824829
 });
-FIRFilter<FILTER_SIZE> f3({
+FIRFilter f3_small(FILTER_SIZE_SMALL, {
   -2.533706e-16, -0.26286556, -0.4253254, -0.4253254, -0.26286556, 0, 0.26286556, 0.4253254, 0.4253254, 0.26286556, 2.533706e-16
 });
 
-// length 25
-/*FIRFilter<FILTER_SIZE> f0({
-  0, 0.005679029, 0.022329099, 0.048815536, 0.083333333, 0.12353016, 0.16666667, 0.20980317, 0.25, 0.2845178, 0.31100423, 0.3276543, 0.33333333, 0.3276543, 0.31100423, 0.2845178, 0.25, 0.20980317, 0.16666667, 0.12353016, 0.083333333, 0.048815536, 0.022329099, 0.005679029, 0
-});
-FIRFilter<FILTER_SIZE> f1({
-  3.5352508e-17, 0.074714623, 0.14433757, 0.20412415, 0.25, 0.27883877, 0.28867513, 0.27883877, 0.25, 0.20412415, 0.14433757, 0.074714623, -0, -0.074714623, -0.14433757, -0.20412415, -0.25, -0.27883877, -0.28867513, -0.27883877, -0.25, -0.20412415, -0.14433757, -0.074714623, -3.5352508e-17
-});
-FIRFilter<FILTER_SIZE> f2({
-  0.2773501, 0.26789962, 0.24019223, 0.19611614, 0.13867505, 0.071783488, -1.6982795e-17, -0.071783488, -0.13867505, -0.19611614, -0.24019223, -0.26789962, -0.2773501, -0.26789962, -0.24019223, -0.19611614, -0.13867505, -0.071783488, -1.6982795e-17, 0.071783488, 0.13867505, 0.19611614, 0.24019223, 0.26789962, 0.2773501
-});
-FIRFilter<FILTER_SIZE> f3({
-  -3.5352508e-17, -0.074714623, -0.14433757, -0.20412415, -0.25, -0.27883877, -0.28867513, -0.27883877, -0.25, -0.20412415, -0.14433757, -0.074714623, 0, 0.074714623, 0.14433757, 0.20412415, 0.25, 0.27883877, 0.28867513, 0.27883877, 0.25, 0.20412415, 0.14433757, 0.074714623, 3.5352508e-17
-});*/
-
 // length 50
-/*FIRFilter<FILTER_SIZE> f0({
+FIRFilter f0_large(FILTER_SIZE_LARGE, {
   0, 0.00095763223, 0.0038148046, 0.0085246025, 0.015009691, 0.023163586, 0.032852399, 0.043917041, 0.056175832, 0.069427481, 0.083454397, 0.098026259, 0.1129038, 0.12784272, 0.14259774, 0.15692657, 0.17059393, 0.18337541, 0.19506114, 0.20545923, 0.21439895, 0.22173351, 0.22734248, 0.23113375, 0.23304508, 0.23304508, 0.23113375, 0.22734248, 0.22173351, 0.21439895, 0.20545923, 0.19506114, 0.18337541, 0.17059393, 0.15692657, 0.14259774, 0.12784272, 0.1129038, 0.098026259, 0.083454397, 0.069427481, 0.056175832, 0.043917041, 0.032852399, 0.023163586, 0.015009691, 0.0085246025, 0.0038148046, 0.00095763223, 0
 });
-FIRFilter<FILTER_SIZE> f1({
+FIRFilter f1_large(FILTER_SIZE_LARGE, {
   2.4741602e-17, 0.025835088, 0.051245965, 0.075815384, 0.099139917, 0.12083657, 0.1405491, 0.15795381, 0.17276493, 0.18473925, 0.19368015, 0.19944084, 0.20192671, 0.20109695, 0.19696518, 0.18959925, 0.17912011, 0.16569982, 0.14955874, 0.13096191, 0.11021469, 0.087657753, 0.063661474, 0.038619875, 0.012944139, -0.012944139, -0.038619875, -0.063661474, -0.087657753, -0.11021469, -0.13096191, -0.14955874, -0.16569982, -0.17912011, -0.18959925, -0.19696518, -0.20109695, -0.20192671, -0.19944084, -0.19368015, -0.18473925, -0.17276493, -0.15795381, -0.1405491, -0.12083657, -0.099139917, -0.075815384, -0.051245965, -0.025835088, -2.4741602e-17
 });
-FIRFilter<FILTER_SIZE> f2({
+FIRFilter f2_large(FILTER_SIZE_LARGE, {
   0.19802951, 0.19640369, 0.19155293, 0.18355687, 0.17254681, 0.15870355, 0.14225437, 0.12346938, 0.10265703, 0.080159047, 0.056344858, 0.031605489, 0.0063471582, -0.019015393, -0.044065711, -0.068392472, -0.09159623, -0.11329598, -0.13313541, -0.15078877, -0.16596618, -0.17841842, -0.18794104, -0.19437768, -0.19762264, -0.19762264, -0.19437768, -0.18794104, -0.17841842, -0.16596618, -0.15078877, -0.13313541, -0.11329598, -0.09159623, -0.068392472, -0.044065711, -0.019015393, 0.0063471582, 0.031605489, 0.056344858, 0.080159047, 0.10265703, 0.12346938, 0.14225437, 0.15870355, 0.17254681, 0.18355687, 0.19155293, 0.19640369, 0.19802951
 });
-FIRFilter<FILTER_SIZE> f3({
+FIRFilter f3_large(FILTER_SIZE_LARGE, {
   -2.4741602e-17, -0.025835088, -0.051245965, -0.075815384, -0.099139917, -0.12083657, -0.1405491, -0.15795381, -0.17276493, -0.18473925, -0.19368015, -0.19944084, -0.20192671, -0.20109695, -0.19696518, -0.18959925, -0.17912011, -0.16569982, -0.14955874, -0.13096191, -0.11021469, -0.087657753, -0.063661474, -0.038619875, -0.012944139, 0.012944139, 0.038619875, 0.063661474, 0.087657753, 0.11021469, 0.13096191, 0.14955874, 0.16569982, 0.17912011, 0.18959925, 0.19696518, 0.20109695, 0.20192671, 0.19944084, 0.19368015, 0.18473925, 0.17276493, 0.15795381, 0.1405491, 0.12083657, 0.099139917, 0.075815384, 0.051245965, 0.025835088, 2.4741602e-17
-});*/
+});
 
-RingBuffer<FILTER_SIZE> filterSamples;
+RingBuffer<FILTER_SIZE_LARGE> filterSamples;
 
 // min/max number of samples to use for stability calculations
 #define STABILITY_MIN 1
-#define STABILITY_MAX 50
+#define STABILITY_MAX 128
 // cutoff magnitude for positive or negative
 #define EPSILON 0.000001
 
@@ -191,8 +180,10 @@ static int update_state(const RingBuffer<STABILITY_MAX>& buffer, const int state
   int posCount = buffer.pos_count(EPSILON, stabilityThreshold);
   int negCount = buffer.neg_count(EPSILON, stabilityThreshold);
 
-  int stabilityUp = stabilityThreshold;
-  int stabilityDown = 0;
+  double downPercentage = stabilityThreshold / (4.0*STABILITY_MAX); // ~0 to 0.25
+  double upPercentage = 1.0 - downPercentage;
+  int stabilityDown = stabilityThreshold * downPercentage;
+  int stabilityUp = max(1, stabilityThreshold * upPercentage);
 
   if (posCount >= stabilityUp) {
     return 1;
@@ -213,7 +204,7 @@ static int update_state(const RingBuffer<STABILITY_MAX>& buffer, const int state
 
 #define SIGNAL_CHANGE_SAMPLE_COUNT 8
 #define SIGNAL_CHANGE_MIN 0.01
-#define SIGNAL_CHANGE_MAX 0.1
+#define SIGNAL_CHANGE_MAX 0.05
 
 static bool audioHandler(struct repeating_timer *t) {
   double sample = to_double(adc_read());
@@ -223,13 +214,6 @@ static bool audioHandler(struct repeating_timer *t) {
     return true;
   }
 
-  d0.put(f0.process(filterSamples));
-  d1.put(f1.process(filterSamples));
-  d2.put(-f2.process(filterSamples)); // not sure why, but negating this is necessary to give expected result for sine input
-  d3.put(f3.process(filterSamples));
-
-  debugVal = d1.last();
-
   // want to get some kind of estimate of the frequency of the input so we can adjust stability requirements for low frequencies
   // to achieve this, we're getting a total of the distances between the newest samples and several recent ones, which should
   // give us a good sense of how much the input is changing
@@ -237,9 +221,19 @@ static bool audioHandler(struct repeating_timer *t) {
   for (int i=0; i<SIGNAL_CHANGE_SAMPLE_COUNT; i++) {
     totalChange += fabs(d0[STABILITY_MAX - i - 1] - d0[STABILITY_MAX - i - 2]);
   }
-
-  // use estimated frequency to adjust stability requirements
   double frequencyFactor = 1.0 - max(0.0, min(1.0, (totalChange - SIGNAL_CHANGE_MIN) / (SIGNAL_CHANGE_MAX - SIGNAL_CHANGE_MIN)));
+
+  FIRFilter* f0 = &f0_small;
+  FIRFilter* f1 = &f1_small;
+  FIRFilter* f2 = &f2_small;
+  FIRFilter* f3 = &f3_small;
+
+  d0.put(f0->process(filterSamples));
+  d1.put(f1->process(filterSamples));
+  d2.put(-f2->process(filterSamples)); // not sure why, but negating this is necessary to give expected result for sine input
+  d3.put(f3->process(filterSamples));
+
+  debugVal = d1.last();
   int stabilityThreshold = STABILITY_MIN + (STABILITY_MAX - STABILITY_MIN) * frequencyFactor;
 
   // perform comparisons
