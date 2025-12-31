@@ -34,7 +34,7 @@ f2 = normalize(arrayfun(f_g2, values, size));
 f3 = normalize(arrayfun(f_g3, values, size));
 
 # formatting for ease of copy-and-paste into c++ code
-f0 = to_string(f0)
-f1 = to_string(f1)
-f2 = to_string(f2)
-f3 = to_string(f3)
+out1 = to_string(f0)
+out2 = to_string(f1)
+out2 = to_string(f2)
+out3 = to_string(f3)

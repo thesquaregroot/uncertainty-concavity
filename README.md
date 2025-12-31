@@ -66,13 +66,26 @@ value, and vice versa.
 The derivative outputs shouldn't be affected by the offset (unless it's
 changing), but you will continue to get these outputs even for an offset signal.
 
-### Sine to Quadrature Square Waveshaper/Distortion
+### Sine to Quadrature Square Waves
 
+With a pure sine wave input, the first four outputs (and also the four
+"positive" outputs, 1/3/5/7) will generate square waves at the input signal's
+frequency, each 90° out of phase from two others.  This is because the
+successive derivatives of sine are: cosine, negative sine, and negative cosine.
 
+At LFO rates, these could be used to generate rhythms, while at audio rates they
+could be used as the start of a mono-to-stereo, or even mono-to-quadraphonic,
+effect.
 
-### Aliasing Noise Effect
+### Crunchy Distortion / Aliasing Noise Effect
 
-
+As previously mentioned, audio rate inputs will increasingly result in phase
+shifted and delayed outputs, all pulse-like representations of some aspect of
+the signal.  The fact that uncertainty only outputs pulse wave, along with the various
+sources of noise and aliasing inherent in the module/firmware design, means that
+as the prominent frequencies of the input signal increase, additional inharmonic
+frequencies will be introduced and amplified.  This resulting in everything from
+subtle metallic qualities to radio-transmission effects to crunchy distortion.
 
 ## Installing
 
