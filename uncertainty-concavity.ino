@@ -7,6 +7,7 @@
 #include <math.h>
 #include "hardware/gpio.h"
 #include "pico/stdlib.h"
+#include "pico/multicore.h"
 #include "hardware/adc.h"
 
 using namespace std;
@@ -50,7 +51,11 @@ public:
   }
 
   double last() const {
-    return this->operator[](_size-1);
+    return this->operator[](_size - 1);
+  }
+
+  double last(const int i) const {
+    return this->operator[](_size - i - 1);
   }
 
   double average() const {
@@ -117,7 +122,7 @@ public:
   double process(const RingBuffer<FILTER_SIZE>& signal) {
     double value = 0.0;
     for (int i=0; i<_length; i++) {
-      value += _coefficients[i] * signal[_length - i - 1];
+      value += _coefficients[i] * signal.last(i);
     }
     return value;
   }
@@ -140,14 +145,15 @@ FIRFilter f3(FILTER_SIZE, {
 RingBuffer<FILTER_SIZE> filterSamples;
 
 // min/max number of samples to use for stability calculations
-#define STABILITY_MIN 4
+#define STABILITY_MIN 1
 #define STABILITY_MAX 128
 // for estimating signal frequency
-#define SIGNAL_CHANGE_SAMPLE_COUNT 8
-#define SIGNAL_CHANGE_MIN 0.001
-#define SIGNAL_CHANGE_MAX 0.1
+#define FREQUENCY_LOW 0.1
+#define FREQUENCY_HIGH 20.0
+// slope cutoff for frequency cycle detection
+#define FREQUENCY_EPSILON 0.01
 // cutoff magnitude for positive or negative
-#define EPSILON 0.00001
+#define EPSILON 0.0001
 
 RingBuffer<STABILITY_MAX> d0;
 RingBuffer<STABILITY_MAX> d1;
@@ -191,47 +197,80 @@ static int update_state(const RingBuffer<STABILITY_MAX>& buffer, const int state
   return state;
 }
 
+int stabilityThreshold = STABILITY_MAX;
+double estimatedFrequency = FREQUENCY_LOW;
+
+void core1_entry() {
+  // not sure why, but negating these is necessary to give expected result for sine input
+  // NOTE: this is not related to running on second core and was present before that change
+  d2.put(-f2.process(filterSamples));
+  d3.put(-f3.process(filterSamples));
+
+  d2_state = update_state(d2, d2_state, stabilityThreshold);
+  d3_state = update_state(d3, d3_state, stabilityThreshold);
+
+  gpio_put(gatePins[4], d2_state == 1);
+  gpio_put(gatePins[5], d2_state == -1);
+  gpio_put(gatePins[6], d3_state == 1);
+  gpio_put(gatePins[7], d3_state == -1);
+}
+
+bool hasBeenNegative = false;
+uint32_t lastTimeDiff = 0;
+uint32_t lastNegToPosZeroCrossing = 0;
+
 static bool audioHandler(struct repeating_timer *t) {
+  uint32_t time = micros();
   double sample = to_double(adc_read());
 
   filterSamples.put(sample);
-  if (!filterSamples.is_full()) {
-    return true;
-  }
 
-  // Want to get some kind of estimate of the frequency of the input so we can adjust stability requirements for low frequencies.
-  // To achieve this, we're getting a total of the distances between the newest samples and several recent ones, which should
-  // give us a good sense of how much the input is changing.
-  double totalChange = 0.0;
-  for (int i=0; i<SIGNAL_CHANGE_SAMPLE_COUNT; i++) {
-    totalChange += fabs(d0[STABILITY_MAX - i - 1] - d0[STABILITY_MAX - i - 2]);
-  }
-  double frequencyFactor = 1.0 - min(1.0, max(0.0, (totalChange - SIGNAL_CHANGE_MIN) / (SIGNAL_CHANGE_MAX - SIGNAL_CHANGE_MIN)));
-  int stabilityThreshold = STABILITY_MIN + (STABILITY_MAX - STABILITY_MIN) * frequencyFactor;
+  // run half of the filters on the other core
+  multicore_reset_core1();
+  multicore_launch_core1(core1_entry);
 
   d0.put(f0.process(filterSamples));
   d1.put(f1.process(filterSamples));
-  // not sure why, but negating these is necessary to give expected result for sine input
-  d2.put(-f2.process(filterSamples));
-  d3.put(-f3.process(filterSamples));
 
   debugVal = d1.last();
 
   // perform comparisons
   d0_state = update_state(d0, d0_state, stabilityThreshold);
   d1_state = update_state(d1, d1_state, stabilityThreshold);
-  d2_state = update_state(d2, d2_state, stabilityThreshold);
-  d3_state = update_state(d3, d3_state, stabilityThreshold);
 
   // output
   gpio_put(gatePins[0], d0_state == 1);
   gpio_put(gatePins[1], d0_state == -1);
   gpio_put(gatePins[2], d1_state == 1);
   gpio_put(gatePins[3], d1_state == -1);
-  gpio_put(gatePins[4], d2_state == 1);
-  gpio_put(gatePins[5], d2_state == -1);
-  gpio_put(gatePins[6], d3_state == 1);
-  gpio_put(gatePins[7], d3_state == -1);
+
+  // update frequency estimate
+  //
+  // using 1st derivative going from negative to positive as a sign that a cycle of some sort has completed
+  // using derivative ensures that we're not susceptible to any DC offset
+  // this should give a decent estimate of the highest frequency component that is large enough to not be smoothed out
+  double lastSlope = d1.last();
+  if (lastSlope > FREQUENCY_EPSILON && hasBeenNegative) {
+    // assume time elapsed is one full period of the highest frequency component
+    lastTimeDiff = time - lastNegToPosZeroCrossing;
+    lastNegToPosZeroCrossing = time;
+    estimatedFrequency = 1000000.0 / lastTimeDiff;
+    hasBeenNegative = false;
+  }
+  else {
+    if (lastSlope < -FREQUENCY_EPSILON) {
+      hasBeenNegative = true;
+    }
+    uint32_t timeDiff = time - lastNegToPosZeroCrossing;
+    if (timeDiff > lastTimeDiff) {
+      // it's been too long, update estimated frequency anyway
+      estimatedFrequency = 1000000.0 / timeDiff;
+    }
+  }
+
+  double frequencyFactor = 1.0 - min(1.0, max(0.0, (estimatedFrequency - FREQUENCY_LOW) / (FREQUENCY_HIGH - FREQUENCY_LOW))); // frequency inverse-lerp
+  double lerpFactor = frequencyFactor * frequencyFactor; // quadratic adjustment
+  stabilityThreshold = STABILITY_MIN + (STABILITY_MAX - STABILITY_MIN) * lerpFactor; // stability count lerp
 
   return true;
 }

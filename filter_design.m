@@ -33,8 +33,15 @@ f1 = normalize(arrayfun(f_g1, values, size));
 f2 = normalize(arrayfun(f_g2, values, size));
 f3 = normalize(arrayfun(f_g3, values, size));
 
+#hold off
+#plot(f0)
+#hold on
+#plot(f1)
+#plot(f2)
+#plot(f3)
+
 # formatting for ease of copy-and-paste into c++ code
-out1 = to_string(f0)
-out2 = to_string(f1)
+out0 = to_string(f0)
+out1 = to_string(f1)
 out2 = to_string(f2)
 out3 = to_string(f3)

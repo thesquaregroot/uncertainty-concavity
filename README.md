@@ -44,12 +44,14 @@ digital filters to smooth the data and perform the derivative calculations.
 This inherently produces phase shift and input lag, which is most noticeable on
 audio-rate signals.  As a result, the description above is mostly applicable for
 LFO-rate signals.  However, ignoring phase-shift/lag, my testing suggests a
-fairly stable output is possible for signals below ~1.5 kHz.
+fairly stable output is generally possible up to about 1.5 kHz, after which the
+results become increasingly wave-shape-dependent, though often up to about 3 kHz
+is okay.
 
-I also did my best to ensure that very slow LFOs also produce stable output,
-but there may be a point with extremely slow signals where the derivatives are
-no longer easily calculated and the bottom six outputs will either stop
-responding to the signal, or produce unexpected results.
+I also did my best to ensure that slower LFOs also produce stable output, but
+there may be a point, below around 0.1 Hz, or 10 seconds per cycle, where the
+derivative values because too small, and the bottom six outputs will either
+stop responding to the signal, or produce unexpected results.
 
 ## Use Cases
 
