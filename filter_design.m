@@ -21,24 +21,30 @@ f_g1 = @(x, L) ( -a*x * exp( -(a*x)^2/2) );
 f_g2 = @(x, L) ( a * (a*x^2 - 1) * exp( -(a*x)^2/2) );
 f_g3 = @(x, L) ( -a^2*x * (a*x^2 - 3) * exp( -(a*x)^2/2 ) );
 
-size = 12
-disp("")
-values = linspace(-size/2, size/2, size);
+size0 = 12;
+size1 = 12;
+size2 = 16;
+size3 = 16;
+
+values0 = linspace(-size0/2, size0/2, size0);
+values1 = linspace(-size1/2, size1/2, size1);
+values2 = linspace(-size2/2, size2/2, size2);
+values3 = linspace(-size3/2, size3/2, size3);
 
 # normalizing the output since we're going to end up doing comparisons on the
 # filter outputs anyway, so this should hopefully resulting in more consistent
 # scaling for said comparisons
-f0 = normalize(arrayfun(f_g0, values, size));
-f1 = normalize(arrayfun(f_g1, values, size));
-f2 = normalize(arrayfun(f_g2, values, size));
-f3 = normalize(arrayfun(f_g3, values, size));
+f0 = arrayfun(f_g0, values0, size0);
+f1 = arrayfun(f_g1, values1, size1);
+f2 = arrayfun(f_g2, values2, size2);
+f3 = arrayfun(f_g3, values3, size3);
 
-#hold off
-#plot(f0)
-#hold on
-#plot(f1)
-#plot(f2)
-#plot(f3)
+hold off
+plot(f0)
+hold on
+plot(f1)
+plot(f2)
+plot(f3)
 
 # formatting for ease of copy-and-paste into c++ code
 out0 = to_string(f0)

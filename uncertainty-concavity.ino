@@ -14,9 +14,10 @@ using namespace std;
 
 // number of output gates
 #define NUM_GATES 8
-#define TARGET_SAMPLE_RATE (40000)
-#define TIMER_INTERVAL ((int)(1000000.0/TARGET_SAMPLE_RATE))
-#define SAMPLE_RATE (1000000.0/TIMER_INTERVAL)
+#define MILLISECONDS_IN_SECOND 1000000.0
+#define TARGET_SAMPLE_RATE 40000
+#define TIMER_INTERVAL ((int)(MILLISECONDS_IN_SECOND/TARGET_SAMPLE_RATE))
+#define SAMPLE_RATE (MILLISECONDS_IN_SECOND/TIMER_INTERVAL)
 
 // ADC input pin
 int inputPin = 26;
@@ -103,7 +104,11 @@ public:
 // A gaussian function is used as a smoothing filter (f0), and its derivatives are used to generate derivative filters (f1/f2/f3)
 // This performed better than smoothing and then performing derivative calculations using finite difference methods afterward
 // see: filter_design.m
-#define FILTER_SIZE 12
+#define FILTER_SIZE_0 12
+#define FILTER_SIZE_1 12
+#define FILTER_SIZE_2 16
+#define FILTER_SIZE_3 16
+#define FILTER_BUFFER_SIZE FILTER_SIZE_3
 
 class FIRFilter {
 private:
@@ -119,7 +124,7 @@ public:
     }
   }
 
-  double process(const RingBuffer<FILTER_SIZE>& signal) {
+  double process(const RingBuffer<FILTER_BUFFER_SIZE>& signal) {
     double value = 0.0;
     for (int i=0; i<_length; i++) {
       value += _coefficients[i] * signal.last(i);
@@ -128,21 +133,24 @@ public:
   }
 };
 
-// length 12
-FIRFilter f0(FILTER_SIZE, {
-  0.0061626445, 0.027278785, 0.089674993, 0.21893041, 0.39694401, 0.53449154, 0.53449154, 0.39694401, 0.21893041, 0.089674993, 0.027278785, 0.0061626445
+FIRFilter f0(FILTER_SIZE_0, {
+  0.011108997, 0.049173683, 0.16165125, 0.39465155, 0.71554503, 0.96349297, 0.96349297, 0.71554503, 0.39465155, 0.16165125, 0.049173683, 0.011108997
 });
-FIRFilter f1(FILTER_SIZE, {
-  0.026146575, 0.094694018, 0.24211651, 0.42221252, 0.4593096, 0.20615594, -0.20615594, -0.4593096, -0.42221252, -0.24211651, -0.094694018, -0.026146575
+FIRFilter f1(FILTER_SIZE_1, {
+  0.03332699, 0.12069904, 0.30860693, 0.5381612, 0.58544594, 0.26277081, -0.26277081, -0.58544594, -0.5381612, -0.30860693, -0.12069904, -0.03332699
 });
-FIRFilter f2(FILTER_SIZE, {
-  0.074103676, 0.21320372, 0.39892784, 0.42105646, 0.095137439, -0.3218225, -0.3218225, 0.095137439, 0.42105646, 0.39892784, 0.21320372, 0.074103676
+FIRFilter f2(FILTER_SIZE_2, {
+  0.0051996707, 0.028297066, 0.10972154, 0.29526885, 0.52266811, 0.52531015, 0.10166087, -0.41390742, -0.41390742, 0.10166087, 0.52531015, 0.52266811, 0.29526885, 0.10972154, 0.028297066, 0.0051996707
 });
-FIRFilter f3(FILTER_SIZE, {
-  0.16047688, 0.35063696, 0.4249255, 0.12421424, -0.3121926, -0.24051157, 0.24051157, 0.3121926, -0.12421424, -0.4249255, -0.35063696, -0.16047688
+FIRFilter f3(FILTER_SIZE_3, {
+  0.019456832, 0.089579532, 0.28213708, 0.57392182, 0.64873633, 0.15226381, -0.49959054, -0.36772708, 0.36772708, 0.49959054, -0.15226381, -0.64873633, -0.57392182, -0.28213708, -0.089579532, -0.019456832
 });
 
-RingBuffer<FILTER_SIZE> filterSamples;
+// samples of raw input
+RingBuffer<FILTER_BUFFER_SIZE> filterSamples;
+// samples with DC-offset removed, since the filter don't do a good job of that on their own
+// and the derivatives should be operating independently of any offset
+RingBuffer<FILTER_BUFFER_SIZE> acSamples;
 
 // min/max number of samples to use for stability calculations
 #define STABILITY_MIN 1
@@ -200,11 +208,22 @@ static int update_state(const RingBuffer<STABILITY_MAX>& buffer, const int state
 int stabilityThreshold = STABILITY_MAX;
 double estimatedFrequency = FREQUENCY_LOW;
 
+// used to determine when a cycle has completed
+bool hasBeenNegative = false;
+uint32_t lastTimeDiff = 0;
+uint32_t lastNegToPosZeroCrossing = 0;
+
+// degree of DC-removal -- higher value means better removal, but reacts slower
+#define DC_REMOVAL_STRENGTH 0.99999
+// these are available elsewhere, but we're caching them as an optimization
+double lastSample = 0.0;
+double lastAcSample = 0.0;
+
 void core1_entry() {
   // not sure why, but negating these is necessary to give expected result for sine input
   // NOTE: this is not related to running on second core and was present before that change
-  d2.put(-f2.process(filterSamples));
-  d3.put(-f3.process(filterSamples));
+  d2.put(-f2.process(acSamples));
+  d3.put(-f3.process(acSamples));
 
   d2_state = update_state(d2, d2_state, stabilityThreshold);
   d3_state = update_state(d3, d3_state, stabilityThreshold);
@@ -215,22 +234,24 @@ void core1_entry() {
   gpio_put(gatePins[7], d3_state == -1);
 }
 
-bool hasBeenNegative = false;
-uint32_t lastTimeDiff = 0;
-uint32_t lastNegToPosZeroCrossing = 0;
-
 static bool audioHandler(struct repeating_timer *t) {
   uint32_t time = micros();
   double sample = to_double(adc_read());
 
   filterSamples.put(sample);
 
+  // simple DC-removal filter for derivative calculations
+  double acSample = sample - lastSample + DC_REMOVAL_STRENGTH * lastAcSample;
+  acSamples.put(acSample);
+  lastSample = sample;
+  lastAcSample = acSample;
+
   // run half of the filters on the other core
   multicore_reset_core1();
   multicore_launch_core1(core1_entry);
 
   d0.put(f0.process(filterSamples));
-  d1.put(f1.process(filterSamples));
+  d1.put(f1.process(acSamples));
 
   debugVal = d1.last();
 
@@ -254,7 +275,7 @@ static bool audioHandler(struct repeating_timer *t) {
     // assume time elapsed is one full period of the highest frequency component
     lastTimeDiff = time - lastNegToPosZeroCrossing;
     lastNegToPosZeroCrossing = time;
-    estimatedFrequency = 1000000.0 / lastTimeDiff;
+    estimatedFrequency = MILLISECONDS_IN_SECOND / lastTimeDiff;
     hasBeenNegative = false;
   }
   else {
@@ -264,7 +285,7 @@ static bool audioHandler(struct repeating_timer *t) {
     uint32_t timeDiff = time - lastNegToPosZeroCrossing;
     if (timeDiff > lastTimeDiff) {
       // it's been too long, update estimated frequency anyway
-      estimatedFrequency = 1000000.0 / timeDiff;
+      estimatedFrequency = MILLISECONDS_IN_SECOND / timeDiff;
     }
   }
 

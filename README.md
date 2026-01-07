@@ -15,14 +15,14 @@ This firmware calculates the following from the input signal:
 
 The outputs correspond two:
 
-1. Positive (input is positive)
-2. Negative (input is negative)
-3. Increasing (first derivative is positive)
-4. Decreasing (first derivative is negative)
-5. Concave Up / Convex (second derivative is positive)
-6. Concave Down / Concave (second derivative is negative)
-7. Concavity Increasing (third derivative is positive)
-8. Concavity Decreasing (third derivative is negative)
+1. Positive value
+2. Negative value
+3. Positive slope, increasing value
+4. Negative slope, decreasing value
+5. Positive concavity (convex), increasing slope
+6. Negative concavity (concave), decreasing slope
+7. Positive jerk, increasing concavity
+8. Negative jerk, decreasing concavity
 
 Whenever these conditions are met, the corresponding output will go high.  When
 the condition is no longer met, the output will go low.  A value that is either
@@ -39,7 +39,7 @@ purpose.
 
 ## Expected Range of Operation
 
-Because derivative calculations inherently amplify noise, this firmware using
+Because derivative calculations inherently amplify noise, this firmware uses
 digital filters to smooth the data and perform the derivative calculations.
 This inherently produces phase shift and input lag, which is most noticeable on
 audio-rate signals.  As a result, the description above is mostly applicable for
@@ -72,7 +72,7 @@ changing), but you will continue to get these outputs even for an offset signal.
 
 With a pure sine wave input, the first four outputs (and also the four
 "positive" outputs, 1/3/5/7) will generate square waves at the input signal's
-frequency, each 90° out of phase from two others.  This is because the
+frequency, each 90 degrees out of phase from two others.  This is because the
 successive derivatives of sine are: cosine, negative sine, and negative cosine.
 
 At LFO rates, these could be used to generate rhythms, while at audio rates they
@@ -81,7 +81,7 @@ effect.
 
 ### Crunchy Distortion / Aliasing Noise Effect
 
-As previously mentioned, audio rate inputs will increasingly result in phase
+As previously mentioned, audio-rate inputs will increasingly result in phase
 shifted and delayed outputs, all pulse-like representations of some aspect of
 the signal.  The fact that uncertainty only outputs pulse wave, along with the various
 sources of noise and aliasing inherent in the module/firmware design, means that
