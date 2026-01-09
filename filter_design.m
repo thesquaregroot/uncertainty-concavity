@@ -18,13 +18,15 @@ to_string = @(v) ( strcat(strjoin(arrayfun(@(x) num2str(x, 8),v,'UniformOutput',
 a = 0.5; # chosen semi-arbitrarily to give relatively even values in the output filter coefficients
 f_g0 = @(x, L) ( exp( -(a*x)^2/2 ) );
 f_g1 = @(x, L) ( -a*x * exp( -(a*x)^2/2) );
+a = 0.6;
 f_g2 = @(x, L) ( a * (a*x^2 - 1) * exp( -(a*x)^2/2) );
+a = 0.65;
 f_g3 = @(x, L) ( -a^2*x * (a*x^2 - 3) * exp( -(a*x)^2/2 ) );
 
 size0 = 12;
 size1 = 12;
-size2 = 16;
-size3 = 16;
+size2 = 12;
+size3 = 12;
 
 values0 = linspace(-size0/2, size0/2, size0);
 values1 = linspace(-size1/2, size1/2, size1);

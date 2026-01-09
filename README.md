@@ -6,14 +6,15 @@ A signal derivative comparator for the Eurorack module
 
 ## About this firmware
 
-This firmware calculates the following from the input signal:
+This firmware calculates (approximations of) the following from the input
+signal:
 
 * Value (the signal itself, or "0th" derivative)
 * Slope (rate of change, or first derivative)
 * Concavity (rate of slope change, or second derivative)
 * Jerk (rate of concavity change, or third derivative)
 
-The outputs correspond two:
+The outputs correspond to:
 
 1. Positive value
 2. Negative value
@@ -30,12 +31,11 @@ zero or indeterminate is ignored.  For example, an input signal that is a
 constant 0V, or extremely noisy/high-frequency, may result in most or all of
 the outputs staying low.
 
-It is also worth noting that the pairs of outputs corresponding to the same
-comparison signal (1/2,  3/4, 5/6, and 7/8) will never be "on" at the same time,
-and will often appear as logical negations of one another.  As a result, each of
-these pairs could be good candidates to use as a pseudo-stereo pair.  Though,
-depending on the input signal, other pairs may be even better suited for this
-purpose.
+The pairs of outputs corresponding to the same comparison signal (1/2, 3/4,
+5/6, and 7/8) will never be "on" at the same time, and will often appear as
+logical negations of one another.  As a result, each of these pairs could be
+good candidates to use as a pseudo-stereo pair.  Though, depending on the
+input signal, other pairs may be even better suited for this purpose.
 
 ## Expected Range of Operation
 
@@ -50,8 +50,16 @@ is okay.
 
 I also did my best to ensure that slower LFOs also produce stable output, but
 there may be a point, below around 0.1 Hz, or 10 seconds per cycle, where the
-derivative values because too small, and the bottom six outputs will either
+derivative values become too small, and the bottom six outputs will either
 stop responding to the signal, or produce unexpected results.
+
+It is additionally worth noting that Uncertainty's input only responds to signal
+values from -5V to +5V.  Whenever the input signal goes below -5V or above +5V,
+the signal will clip internally, generally resulting in altered gate length at
+the derivative outputs.  Depending on the input signal's frequency, this can be
+used for to achieve a pulse-width modulation effect, but otherwise may not be
+desired.  In that case, be prepared to offset and/or attenuate your input signal
+to put it within the -5V to +5V range.
 
 ## Use Cases
 
@@ -65,8 +73,12 @@ second output will go high when the value is below the threshold.  Just keep in
 mind that a positive signal offset would be like having a negative threshold
 value, and vice versa.
 
-The derivative outputs shouldn't be affected by the offset (unless it's
-changing), but you will continue to get these outputs even for an offset signal.
+The derivative outputs shouldn't (but may) be affected by the offset (especially
+if it's changing), but you will continue to get these outputs even
+for an offset signal, as long as it remains in the -5V to +5V range.  In this
+way, an audio-rate signal mixed with a changing offset (i.e. an LFO) can be used
+to achieve a pulse-width modulation (PWM) effect, in at least the first two
+outputs.
 
 ### Sine to Quadrature Square Waves
 
