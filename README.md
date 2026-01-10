@@ -89,14 +89,14 @@ outputs.
 
 ### Sine to Quadrature Square Waves
 
-With a pure sine wave input, the first four outputs (and also the four
-"positive" outputs, 1/3/5/7) will generate square waves at the input signal's
-frequency, each 90 degrees out of phase from two others.  This is because the
-successive derivatives of sine are: cosine, negative sine, and negative cosine.
+With a pure sine wave input, the first four outputs will generate square waves
+at the input signal's frequency, each 90 degrees out of phase from two others.
+This is because the successive derivatives of sine are: cosine, negative sine,
+and negative cosine.
 
-At LFO rates, these could be used to generate rhythms, while at audio rates they
-could be used as the start of a mono-to-stereo, or even mono-to-quadraphonic,
-effect.
+At LFO rates, these could be used to generate rhythms (especially in conjunction
+with the faster bottom two outputs), while at audio rates they could be used as
+the start of a mono-to-stereo, or even mono-to-quadraphonic, effect.
 
 ### Crunchy Distortion / Aliasing Noise Effect
 
