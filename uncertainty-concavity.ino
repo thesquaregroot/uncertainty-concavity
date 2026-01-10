@@ -15,7 +15,7 @@ using namespace std;
 // number of output gates
 #define NUM_GATES 8
 #define MILLISECONDS_IN_SECOND 1000000.0
-#define TARGET_SAMPLE_RATE 48000
+#define TARGET_SAMPLE_RATE 40000
 #define TIMER_INTERVAL ((int)(MILLISECONDS_IN_SECOND/TARGET_SAMPLE_RATE))
 #define SAMPLE_RATE (MILLISECONDS_IN_SECOND/TIMER_INTERVAL)
 
@@ -104,10 +104,10 @@ public:
 // A gaussian function is used as a smoothing filter (f0), and its derivatives are used to generate derivative filters (f1/f2/f3)
 // This performed better than smoothing and then performing derivative calculations using finite difference methods afterward
 // see: filter_design.m
-#define FILTER_SIZE_0 12
-#define FILTER_SIZE_1 12
-#define FILTER_SIZE_2 12
-#define FILTER_SIZE_3 12
+#define FILTER_SIZE_0 11
+#define FILTER_SIZE_1 11
+#define FILTER_SIZE_2 11
+#define FILTER_SIZE_3 11
 #define FILTER_BUFFER_SIZE FILTER_SIZE_3
 
 class FIRFilter {
@@ -136,17 +136,17 @@ public:
 };
 
 FIRFilter f0(FILTER_SIZE_0, {
-  0.011108997, 0.049173683, 0.16165125, 0.39465155, 0.71554503, 0.96349297, 0.96349297, 0.71554503, 0.39465155, 0.16165125, 0.049173683, 0.011108997
+  0.022794181, 0.088921617, 0.25634015, 0.54607443, 0.85963276, 1, 0.85963276, 0.54607443, 0.25634015, 0.088921617, 0.022794181
 });
 FIRFilter f1(FILTER_SIZE_1, {
-  0.03332699, 0.12069904, 0.30860693, 0.5381612, 0.58544594, 0.26277081, -0.26277081, -0.58544594, -0.5381612, -0.30860693, -0.12069904, -0.03332699
+  0.062683997, 0.19562756, 0.42296125, 0.60068187, 0.47279802, -0, -0.47279802, -0.60068187, -0.42296125, -0.19562756, -0.062683997
 });
 FIRFilter f2(FILTER_SIZE_2, {
-  0.0189579, 0.10550559, 0.33701147, 0.54466289, 0.22477043, -0.46719069, -0.46719069, 0.22477043, 0.54466289, 0.33701147, 0.10550559, 0.0189579
+  0.1609839, 0.38591982, 0.56971599, 0.38771284, -0.16977747, -0.5, -0.16977747, 0.38771284, 0.56971599, 0.38591982, 0.1609839
 });
-FIRFilter f3(FILTER_SIZE_3, {
-  0.025751267, 0.16160057, 0.48027612, 0.43926259, -0.4945869, -0.6073956, 0.6073956, 0.4945869, -0.43926259, -0.48027612, -0.16160057, -0.025751267
-});
+/*FIRFilter f3(FILTER_SIZE_3, {
+  0.029605214, 0.19817002, 0.51869794, 0.12778035, -0.86275244, 0, 0.86275244, -0.12778035, -0.51869794, -0.19817002, -0.029605214
+});*/
 
 // samples of raw input
 RingBuffer<FILTER_BUFFER_SIZE> filterSamples;
@@ -168,11 +168,11 @@ RingBuffer<FILTER_BUFFER_SIZE> acSamples;
 RingBuffer<STABILITY_MAX> d0;
 RingBuffer<STABILITY_MAX> d1;
 RingBuffer<STABILITY_MAX> d2;
-RingBuffer<STABILITY_MAX> d3;
+//RingBuffer<STABILITY_MAX> d3;
 int d0_state = 0;
 int d1_state = 0;
 int d2_state = 0;
-int d3_state = 0;
+//int d3_state = 0;
 
 static double to_double(uint32_t value) {
   double center = 1 << 11;
@@ -215,7 +215,7 @@ bool hasBeenNegative = false;
 uint32_t lastTimeDiff = 0;
 uint32_t lastNegToPosZeroCrossing = 0;
 
-// degree of DC-removal -- higher value means better removal, but reacts slower
+// degree of DC-removal -- closer to one means cleaner DC removal, but slower reaction time
 #define DC_REMOVAL_STRENGTH 0.99999
 // these are available elsewhere, but we're caching them as an optimization
 double lastSample = 0.0;
@@ -225,15 +225,22 @@ void core1_entry() {
   // not sure why, but negating these is necessary to give expected result for sine input
   // NOTE: this is not related to running on second core and was present before that change
   d2.put(-f2.process(acSamples));
-  d3.put(-f3.process(acSamples));
 
   d2_state = update_state(d2, d2_state, stabilityThreshold);
-  d3_state = update_state(d3, d3_state, stabilityThreshold);
+
+  bool equal = (d1_state != 0 && d2_state == d1_state);
+  bool notEqual = (d1_state != 0 && d2_state != 0 && d2_state != d1_state);
 
   gpio_put(gatePins[4], d2_state == 1);
   gpio_put(gatePins[5], d2_state == -1);
-  gpio_put(gatePins[6], d3_state == 1);
-  gpio_put(gatePins[7], d3_state == -1);
+  // In initial versions, the final two outputs corresponded to the third derivative of the signal,
+  // but the filter for this was particularly inaccurate, often just tracking the
+  // first derivative signal.
+  //
+  // Using comparisons of the first and second derivatives instead often yields much more
+  // interesting outputs, both at slow rates (e.g. for rhythms) and at audio-rate.
+  gpio_put(gatePins[6], equal);
+  gpio_put(gatePins[7], notEqual);
 }
 
 static bool audioHandler(struct repeating_timer *t) {

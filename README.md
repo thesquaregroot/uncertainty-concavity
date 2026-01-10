@@ -12,7 +12,6 @@ signal:
 * Value (the signal itself, or "0th" derivative)
 * Slope (rate of change, or first derivative)
 * Concavity (rate of slope change, or second derivative)
-* Jerk (rate of concavity change, or third derivative)
 
 The outputs correspond to:
 
@@ -22,8 +21,8 @@ The outputs correspond to:
 4. Negative slope, decreasing value
 5. Positive concavity (convex), increasing slope
 6. Negative concavity (concave), decreasing slope
-7. Positive jerk, increasing concavity
-8. Negative jerk, decreasing concavity
+7. Slope and concavity have same sign (not 0)
+8. Slope and concavity have opposite sign (neither 0)
 
 Whenever these conditions are met, the corresponding output will go high.  When
 the condition is no longer met, the output will go low.  A value that is either
@@ -33,9 +32,17 @@ the outputs staying low.
 
 The pairs of outputs corresponding to the same comparison signal (1/2, 3/4,
 5/6, and 7/8) will never be "on" at the same time, and will often appear as
-logical negations of one another.  As a result, each of these pairs could be
-good candidates to use as a pseudo-stereo pair.  Though, depending on the
-input signal, other pairs may be even better suited for this purpose.
+logical negations of one another.  As a result, each of these pairs will
+generally sound similar, and could be good candidates to use as a
+pseudo-stereo pair.  With simple signals (e.g. sine or triangle waves),
+outputs 1-6 will generally appear similar and have the same frequency has the
+input.  Outputs 7-8, however, will generally present with a frequency
+multiplication or ring modulation effect, and may be more harmonically rich.
+This makes sense as the equal/not-equal operations are logically equivalent to
+XNOR and XOR.  For pure sine inputs, this should theoretically be an exact
+doubling, due to the derivatives alternating between sine and cosine and the
+double-angle formula from trigonometry (given that the XOR acts as a
+multiplication).
 
 ## Expected Range of Operation
 
