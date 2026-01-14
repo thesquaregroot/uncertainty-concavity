@@ -4,6 +4,10 @@ A signal derivative comparator for the Eurorack module
 [Uncertainty](https://oamodular.org/products/uncertainty) by
 [Olivia Artz Modular](https://github.com/oamodular).
 
+An audio demo showing some of the rhythms/sounds produced by this firmware can
+be found
+[here](https://soundcloud.com/thesquaregroot/concavity-firmware-sound-demo).
+
 ## About this firmware
 
 This firmware calculates (approximations of) the following from the input
